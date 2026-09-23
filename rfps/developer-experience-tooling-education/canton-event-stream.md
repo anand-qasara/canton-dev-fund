@@ -1,22 +1,55 @@
-**Author:** Anand <anand@qasara.ai>, Qasara
+## Development Fund Proposal
+
+**Organization:** Qasara
+**Author / Primary Contact:** Anand <anand@qasara.ai>
 **Status:** Submitted
 **Created:** 2026-05-05
+**Proposal Type:** RFP-aligned
+**RFP / Roadmap Area:** RFP 20, Indexers (rfp-20: indexers-observability), node-local. Also serves RFP 14, Wallet and dApp Integration tooling. Category: Developer Experience, Tooling & Education.
+**Total Funding Request:** 300,000 CC (Phase 1)
+**Project Duration:** up to ~8.5 months (14-week build, then an external-adoption window of up to 6 months after the Milestone 2 release)
 **Label:** canton-apis
-**Champion:** 
 
 ---
 
 # Canton Event Stream — Real-Time Ledger Events via WebSocket & SSE
 
 > Canton Development Fund Proposal
-> Phase 1 funding request: 300,000 CC across 3 milestones. Build (M1, M2, and the M3 release) is ~14 weeks; the M3 external-adoption window runs up to 6 months. The final milestone is 50% of the grant, released when the service is adopted by at least 3 independent teams on MainNet.
+> Phase 1 funding request: 300,000 CC across 3 milestones. Build (M1, M2, and the M3 release) is ~14 weeks; the M3 external-adoption window runs up to 6 months after the Milestone 2 release, so total duration is up to ~8.5 months. The final milestone is 50% of the grant, released when the service is adopted by at least 3 independent teams on MainNet.
 > Phase 2 (multi-hosted HA + multi-synchronizer reassignment) is scoped as a follow-on grant requiring a multi-participant / multi-synchronizer testbed — see **Phasing**.
+
+---
+
+## RFP Alignment
+
+This proposal answers **RFP 20 (Indexers)**, in the node-local part. Canton Event Stream runs next to a validator and pushes that validator's ledger events to the apps it serves. PQS, the example the RFP gives, lets apps ask for data. This service tells apps the moment something happens. It also helps with **RFP 14 (Wallet and dApp tooling)**, because a wallet can point its dApps to it (see *dApp integration* below).
+
+RFP 20 asks four questions. Our answers:
+
+1. **What data do you use?** Only the events the operator's own validator already receives from the Ledger API.
+2. **Where does it come from?** The operator's own node. We read nothing from the Mediator or any other public network data.
+3. **What if that public data stops being available?** Nothing changes for us. We never used it.
+4. **How do you protect privacy?** Each user only gets events for the parties they are allowed to see, and we check this before any stream opens (see *Authorization model* below).
+
+---
+
+## Who benefits and how it drives adoption
+
+Any team whose app needs to react when something happens on the ledger: a wallet showing a payment as it arrives, an exchange spotting a deposit, a risk tool raising an alert. Today each of these teams builds the same plumbing on its own.
+
+We know the need is real because teams have said so:
+
+- Woof said they would use this instead of building their own ([comment](https://github.com/canton-foundation/canton-dev-fund/pull/300#issuecomment-5024128613)).
+- A team building for mobile said they would use it, since a phone can't stay connected to a validator itself ([comment](https://github.com/canton-foundation/canton-dev-fund/pull/300#issuecomment-5083264453)).
+- Three other Dev Fund projects need live events and are each building their own way to get them: Hacken (#302, already approved), Zpoken (#138) and #51.
+
+Building it once saves every one of those teams that work. And half of this grant is paid only after at least three independent teams are running it on MainNet, so real adoption is the condition for payment, not just a promise.
 
 ---
 
 ## Abstract
 
-Canton Event Stream is an open-source, Apache 2, self-hostable Node.js service that connects to any Canton participant node and delivers classified, party-authorized ledger events to application clients over WebSocket and Server-Sent Events (SSE). Canton already provides a native push *transport* (the JSON Ledger API WebSocket channels and gRPC `UpdateService.GetUpdates`); Canton Event Stream is the **application-edge layer above it** — it takes one upstream subscription, re-enforces Canton's per-party visibility at the streaming edge, classifies raw events into a stable application vocabulary, and fans them out to many clients without each client connecting to the participant or holding a ledger token. The transport and event-classification core already run against Canton DevNet inside Qasara's commercial Canton Gateway; this proposal open-sources that core as a standalone package and builds the net-new pieces the ecosystem needs — per-party authorization at the streaming edge, RecordTime ordering, and configurable subscriptions — complementing PQS (CIP-0100, the pull/SQL layer) on the same validator without overlap. Qasara's commercial offering is a hosted infrastructure service that runs this same open-source code: the grant funds the OSS package, and the hosted product consumes it as-is rather than maintaining a private fork, so every improvement made here reaches self-hosters and the hosted service alike.
+Canton Event Stream is an open-source, Apache 2, self-hostable Node.js service that connects to any Canton participant node and delivers classified, party-authorized ledger events to application clients over WebSocket and Server-Sent Events (SSE). Canton already provides a native push *transport* (the JSON Ledger API WebSocket channels and gRPC `UpdateService.GetUpdates`); Canton Event Stream is the **application-edge layer above it** — it takes one upstream subscription, re-enforces Canton's per-party visibility at the streaming edge, classifies raw events into a stable application vocabulary, and fans them out to many clients without each client connecting to the participant or holding a ledger token. The transport and event-classification core already run against Canton DevNet inside Qasara's commercial Canton Gateway; this proposal open-sources that core as a standalone package and builds the net-new pieces the ecosystem needs — per-party authorization at the streaming edge, RecordTime ordering, and configurable subscriptions — complementing PQS (the pull/SQL layer, open-sourced under Dev Fund PR #67) on the same validator without overlap. Qasara's commercial offering is a hosted infrastructure service that runs this same open-source code: the grant funds the OSS package, and the hosted product consumes it as-is rather than maintaining a private fork, so every improvement made here reaches self-hosters and the hosted service alike.
 
 ---
 
@@ -231,7 +264,7 @@ Operators can add interfaces/templates and classification rules to this profile,
 
 **Developer Experience**: Today every team solves this independently. A single, well-maintained open-source solution eliminates duplicate engineering and reduces the surface area for subtle bugs in each custom implementation.
 
-**Complementary to PQS (CIP-0100)**: PQS is the pull layer (offset-paged SQL queries against a materialized Postgres ODS). Canton Event Stream is the push layer. Production applications need both. PQS exposes no LISTEN/NOTIFY, no change feed, no subscription primitive — it is exclusively offset-paged query functions. (Detailed comparison in Rationale below.)
+**Complementary to PQS**: PQS is the pull layer (offset-paged SQL queries against a materialized Postgres ODS). Canton Event Stream is the push layer. Production applications need both. PQS exposes no LISTEN/NOTIFY, no change feed, no subscription primitive — it is exclusively offset-paged query functions. (Detailed comparison in Rationale below.)
 
 **Token-standard alignment (CIP-0056 + CIP-0112)**: The default profile uses both the CIP-0056 (V1) and CIP-0112 (V2) token-standard interfaces, so the ingester works with any compliant token without modification, and V2's holdings-change transfer-events are read directly rather than inferred from choices. The same interface-based mechanism extends to any other interface an operator configures, supporting the Canton multi-asset future.
 
@@ -335,7 +368,7 @@ The final milestone is **50%** of the grant, released when the service is runnin
 
 ### Volatility Stipulation
 
-Phase 1 build is **~14 weeks** (M1, M2, and the M3 release); the M3 external-adoption window then runs up to 6 months, so total Phase 1 duration is **up to ~6 months**. Should the timeline extend beyond that due to Committee-requested scope changes, any remaining milestones must be renegotiated to account for significant USD/CC price volatility.
+Phase 1 build is **~14 weeks** (M1, M2, and the M3 release); the M3 external-adoption window then runs up to 6 months after the Milestone 2 release (Week 11), so total Phase 1 duration is **up to ~8.5 months**. Because that exceeds 6 months, the grant is denominated in fixed Canton Coin and remaining milestones will be re-evaluated at the 6-month mark, per the Fund's volatility stipulation.
 
 ---
 
@@ -380,7 +413,7 @@ To turn this into something an application can act on, every team must build eve
 
 **Ecosystem portion benefited:** The **majority of new Canton dApp and fintech development happens on Node.js / TypeScript stacks** — the Canton Wallet SDK is TypeScript-native, and the dApp/fintech developer mainstream is Node.js. Every team in that segment that needs real-time event delivery is addressable — wallet UIs, exchange integrations, reactive backends. JVM-stack teams are not excluded: the WebSocket and SSE endpoints are language-neutral wire protocols, so any client (Java, Python, Rust, Go) consumes them without a Node.js runtime; they simply gain less from the TypeScript-native implementation itself. We expect a measurable reduction in time-to-first-event for new Canton applications as adoption grows.
 
-**Strategic importance:** Approving PQS (CIP-0100) without a complementary push layer leaves every Canton application team to rebuild that push layer independently — exactly the duplication a foundational push component eliminates. PQS makes ledger state queryable and historically auditable; Canton Event Stream makes ledger events deliverable to live UIs and reactive backends. Production applications need both layers.
+**Strategic importance:** Funding PQS (PR #67) without a complementary push layer leaves every Canton application team to rebuild that push layer independently — exactly the duplication a foundational push component eliminates. PQS makes ledger state queryable and historically auditable; Canton Event Stream makes ledger events deliverable to live UIs and reactive backends. Production applications need both layers.
 
 ---
 
@@ -388,7 +421,7 @@ To turn this into something an application can act on, every team must build eve
 
 ### Why a new component, not an extension of PQS
 
-CIP-0100 (PR #67, merged 2026-04-23) approved Digital Asset's grant to open-source PQS — the Participant Query Store — under Apache 2.0. PQS and Canton Event Stream serve different layers of the same stack and cannot be folded into one another:
+Dev Fund PR #67 (merged 2026-04-23) approved Digital Asset's grant to open-source PQS — the Participant Query Store — under Apache 2.0. PQS and Canton Event Stream serve different layers of the same stack and cannot be folded into one another:
 
 | Dimension | PQS (offset-paged SQL ODS) | Canton Event Stream (push) |
 |---|---|---|
